@@ -1,52 +1,42 @@
 ---
-title: "Visualizing Covid-19"
 author: "Trist'n Joseph (trisxcjoseph@gmail.com)"
-date: "6/14/2020"
-output: html_document
 ---
 
 #Set up
 ```{r}
 library(readr)
 library(tidyverse)
-library(ggthemes)
+library(ggthemes) # contains the theme that I will be using for the graphs
 
 ```
+
 Data retrieved from a publicly available data repository (https://github.com/RamiKrispin/coronavirus). 
 
 #Overall cases
 ```{r}
-confirmed_cases <- read_csv("E:/Projects/Covid19/covid19_autoupdate_1.csv")
-str(confirmed_cases)
-confirmed_cases$date <- parse_date(confirmed_cases$date, format="%m/%d/%Y")
-confirmed_cases$type <- parse_factor(confirmed_cases$type)
-levels(confirmed_cases$type)
-check_this <- confirmed_cases%>%
-  filter(type != "confirmed")
-sum(check_this$cases)
-  
-glimpse(confirmed_cases)
-anyNA(confirmed_cases)
-sum(is.na(confirmed_cases$cases))
-confirmed_cases$province <- NULL
-confirmed_cases <- na.omit(confirmed_cases)
-anyNA(confirmed_cases)
-head(confirmed_cases)
 
-confirmed_cases <- confirmed_cases%>%
+covid_df <- read_csv("E:/Projects/Covid19/covid19_autoupdate.csv")
+glimpse(covid_df)
+covid_df$date <- parse_date(covid_df$date, format="%m/%d/%Y")
+covid_df$type <- parse_factor(covid_df$type)
+anyNA(covid_df)
+
+confirmed_cases <- covid_df%>%
   filter(type=="confirmed")%>%
   select(c("date", "country", "cases"))
 
 confirmed_cases_total <- confirmed_cases%>%
   group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
+  summarise(Total_cases= sum(cases))%>% 
+  # aggregate cases by day
+  mutate(Cumulative_cases = cumsum(Total_cases)) 
+  # calculate the cumulative number of cases
  
-  
 ggplot(confirmed_cases_total, aes(x=date, y=Cumulative_cases))+
   geom_line()+
   scale_y_log10()+
-  scale_x_date(date_breaks = "months", date_labels = "%b-%Y")+
+  scale_x_date(date_breaks = "months", date_labels = "%b-%Y")+ 
+  # shows the month and year as x-axis tick markers
   ylab("Cumulative Cases")+
   xlab("Date")+
   ggtitle("Cumulative World Covid-19 Cases per day")+
@@ -54,33 +44,27 @@ ggplot(confirmed_cases_total, aes(x=date, y=Cumulative_cases))+
 
 ```
 
-World COVID-19 cases increased raplidly between January and February. The graph shows that the rate of new cases slowed down at the of end February, but rapidly increased again during March and April. The rate of new cases after April is lower than that of the rate of new cases during March - April, but cases are still increasing worldwide.   
-Although cases were primarily concentrated in China during the early period of the COVID-19 outbreak, the United States quickly became the area of concern. Therefore, I will next plot the United States versus the rest of the world to gather insight as to the upticks in cases during March and beyond.
-
-
-
 #USA vs World
 ```{r}
-usa_vs_world <- confirmed_cases
 
-usa_vs_world_us <- usa_vs_world%>%
+usa_vs_world_us <- confirmed_cases%>%
   filter(country == "US")%>%
   group_by(date)%>%
   summarise(Total_cases= sum(cases))%>%
   mutate(Cumulative_cases = cumsum(Total_cases))
-usa_vs_world_us$Location <- as.factor(rep("USA", nrow(usa_vs_world_us)))
+usa_vs_world_us$Location <- as.factor(rep("USA", nrow(usa_vs_world_us))) # creates a membership variable
 
-usa_vs_world_notus <- usa_vs_world%>%
+usa_vs_world_notus <- confirmed_cases%>%
   filter(country != "US")%>%
-  #group_by(date)%>%
   group_by(date)%>%
   summarise(Total_cases= sum(cases))%>%
   mutate(Cumulative_cases = cumsum(Total_cases))
-usa_vs_world_notus$Location <- as.factor(rep("Not USA", nrow(usa_vs_world_notus)))
+usa_vs_world_notus$Location <- as.factor(rep("Not USA", nrow(usa_vs_world_notus))) # creates a membership variable
 
 usa_vs_world <- rbind(usa_vs_world_us, usa_vs_world_notus)
 
-ggplot(usa_vs_world, aes(x=date, y=Cumulative_cases, color=Location))+
+ggplot(usa_vs_world, aes(x=date, y=Cumulative_cases, color=Location))+ 
+  # 'color' colours individual lines on the plot by the memebership variable
   geom_line()+
   scale_y_log10()+
   scale_x_date(date_breaks = "months", date_labels = "%b-%Y")+
@@ -91,15 +75,11 @@ ggplot(usa_vs_world, aes(x=date, y=Cumulative_cases, color=Location))+
 
 ```
 
-The two curves have similar shapes. The graph shows that the number of confirmed cases within the United States increased rapidly during March, and this rapid increase continued until April. Although this does provide insight to the jump in cases seeing on the original plot, it can also be seen that the rest of the world still saw a rapidly increasing number of confirmed cases during and after March.
-Next, I will investigate the United States versus China to determine the differences and similarities between the outbreaks within those countires. 
-
 #China vs USA
 ```{r}
 
 confirmed_cases_USA <- usa_vs_world_us
-confirmed_cases_USA$Country <- confirmed_cases_USA$Location
-confirmed_cases_USA$Location<- NULL
+confirmed_cases_USA <- rename(confirmed_cases_USA,"Country"="Location")
 
 confirmed_cases_China <- confirmed_cases%>%
   filter(country == "China")%>%
@@ -121,9 +101,6 @@ ggplot(confirmed_cases_China, aes(x=date, y=Cumulative_cases, color=Country))+
 
 ```
 
-The graph shows that as the United States continued to grow in confirmed cases, China relatively leveled off at the end of February. Therefore, China's cases do not explain the jump seen within the previous graphs. 
-Therefore, it would be of great value to determine which countries were hit the hardest in terms of number of cases and compare their growth aginst each other. 
-
 #Which countries were hit the hardest ?
 ```{r}
 
@@ -131,7 +108,7 @@ Hardest_hit_Countries <- confirmed_cases%>%
   group_by(country)%>%
   summarise(Total_cases = sum(cases))%>%
   arrange(desc(Total_cases))%>%
-  top_n(5)
+  top_n(5) # selects the top 5 countries 
 
 Hardest_hit_Countries<-rename(Hardest_hit_Countries,"Country"="country")
 Hardest_hit_Countries
@@ -143,33 +120,13 @@ confirmed_cases_Brazil <- confirmed_cases%>%
   mutate(Cumulative_cases = cumsum(Total_cases))
 confirmed_cases_Brazil$Country <- as.factor(rep("Brazil", nrow(confirmed_cases_Brazil)))
 
-
-confirmed_cases_Russia <- confirmed_cases%>%
-  filter(country == "Russia")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-confirmed_cases_Russia$Country <- as.factor(rep("Russia", nrow(confirmed_cases_Russia)))
-
-confirmed_cases_India <- confirmed_cases%>%
-  filter(country == "India")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-confirmed_cases_India$Country <- as.factor(rep("India", nrow(confirmed_cases_India)))
-
-
-confirmed_cases_SouthAfrica <- confirmed_cases%>%
-  filter(country == "South Africa")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-confirmed_cases_SouthAfrica$Country <- as.factor(rep("South Africa", nrow(confirmed_cases_SouthAfrica)))
+# loop through the hardest hit countries and create a df for reach 
+# at the time of creating this, the top 5 countries are: USA, Brazil, Russia, India & South Africa
 
 confirmed_cases_Hardest_hit_countries <- rbind(confirmed_cases_USA, confirmed_cases_Brazil, confirmed_cases_Russia, confirmed_cases_India, confirmed_cases_SouthAfrica)
 
 confirmed_cases_Hardest_hit_countries <- confirmed_cases_Hardest_hit_countries%>%
-  filter(date >= "2020-03-15")
+  filter(date >= "2020-03-15") # filtered the date to make the plot easier to read
 
 hardest_hit_graph <- ggplot(confirmed_cases_Hardest_hit_countries)+
   geom_line(mapping=aes(x=date, y=Cumulative_cases, color=Country))+
@@ -189,20 +146,16 @@ lockdown_countries <- tribble(
 )%>%
   mutate(date = as.Date(date))
 
-
+# this plot contains dashed markers to show when each country went into lockdown 
 hardest_hit_graph + 
   geom_vline(aes(xintercept = date), data = lockdown_countries, linetype = "dashed")+
-  geom_text(aes(x=date, label = event), data = lockdown_countries, y=c(6000000, 1000000, 5000000, 3000000))
-
-
+  geom_text(aes(x=date, label = event), data = lockdown_countries, y=c(6000000, 1000000, 5000000, 3000000)) 
+  
 ```
-
-The top 5 hardest hit countries, in terms of number of confirmed cases, were the United States, Brazil, Russia, India and South Africa. 
-The graph shows how each country's number of confirmed cases increased, as well as when those countires went into lockdown. All countries seem to have increased at a faster rate after their lockdown was imposed.
-
 
 #Hardest his versus the world
 ```{r}
+
 rest_of_world <- confirmed_cases%>%
   filter(country !="US" | country !="Brazil" |country !="Russia"|country !="India"|country !="South Africa"| country !="China")%>%
   group_by(date)%>%
@@ -212,7 +165,7 @@ rest_of_world$Country <- as.factor(rep("Rest of world", nrow(rest_of_world)))
 
 Hardest_hit_vs_world <- rbind(confirmed_cases_Hardest_hit_countries, rest_of_world)
 Hardest_hit_vs_world <- Hardest_hit_vs_world%>%
-  filter(date >= "2020-03-15")
+  filter(date >= "2020-03-15") # filtered the date to make the plot easier to read
 
 ggplot(Hardest_hit_vs_world)+
   geom_line(mapping=aes(x=date, y=Cumulative_cases, color=Country))+
@@ -225,95 +178,15 @@ ggplot(Hardest_hit_vs_world)+
 
 ```
 
-The graph shows that the hardest hit countries account for a considerable portion in the uptick in cases during and after March, but there still exsists a bump in the rest of the world during March. 
-Therefore, I will determine which countries account for the marjority of worldwide COVID-19 cases.  
-
-#Hardest hit before May
+#Hardest hit up until April
 ```{r}
 
-############ hardest hit before May 
-
-Hardest_hit_Countries_before_may <- confirmed_cases%>%
+Hardest_hit_Countries_before_april <- confirmed_cases%>%
   filter(date <= "2020-04-01")%>%
   group_by(country)%>%
   summarise(Total_cases = sum(cases))%>%
   arrange(desc(Total_cases))%>%
   top_n(5)
-
-#### ignore below 
-Hardest_hit_Countries_before_may<-rename(Hardest_hit_Countries_before_may,"Country"="country")
-Hardest_hit_Countries_before_may
-
-confirmed_cases_usa_may <- confirmed_cases%>%
-  filter(country == "US")%>%
-  filter(date <= "2020-04-15")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-confirmed_cases_usa_may$Country <- as.factor(rep("USA", nrow(confirmed_cases_usa_may)))
-
-
-confirmed_cases_UK <- confirmed_cases%>%
-  filter(country == "United Kingdom")%>%
-  filter(date <= "2020-04-15")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-confirmed_cases_UK$Country <- as.factor(rep("UK", nrow(confirmed_cases_UK)))
-
-confirmed_cases_Italy <- confirmed_cases%>%
-  filter(country == "Italy")%>%
-  filter(date <= "2020-04-15")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-confirmed_cases_Italy$Country <- as.factor(rep("Spain", nrow(confirmed_cases_Italy)))
-
-confirmed_cases_Germany <- confirmed_cases%>%
-  filter(country == "Germany")%>%
-  filter(date <= "2020-04-15")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-confirmed_cases_Germany$Country <- as.factor(rep("Germany", nrow(confirmed_cases_Germany)))
-
-confirmed_cases_France <- confirmed_cases%>%
-  filter(country == "France")%>%
-  filter(date <= "2020-04-15")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-confirmed_cases_France$Country <- as.factor(rep("France", nrow(confirmed_cases_France)))
-
-confirmed_cases_Hardest_hit_countries_may <- rbind(confirmed_cases_usa_may, confirmed_cases_UK, confirmed_cases_Italy, confirmed_cases_Germany, confirmed_cases_France)
-
-
-
-```
-
-
-#Hardest hit before May vs rest of world
-```{r}
-
-rest_of_world_may <- confirmed_cases%>%
-  filter(country !="US" | country !="United Kingdom" |country !="Italy"|country !="Germany"|country !="France"| country !="China")%>%
-  filter(date <= "2020-04-15")%>%
-  group_by(date)%>%
-  summarise(Total_cases= sum(cases))%>%
-  mutate(Cumulative_cases = cumsum(Total_cases))
-rest_of_world_may$Country <- as.factor(rep("Rest of world", nrow(rest_of_world_may)))
-
-Hardest_hit_vs_world_may <- rbind(confirmed_cases_Hardest_hit_countries_may, rest_of_world_may)
-
-ggplot(Hardest_hit_vs_world_may)+
-  geom_line(mapping=aes(x=date, y=Cumulative_cases, color=Country))+
-  scale_y_log10()+
-  scale_x_date(date_breaks = "months", date_labels = "%b-%Y")+
-  xlab("Date")+
-  ylab("Cumulative Cases") + 
-  ggtitle("Cumulative Covid-19 Cases,\nHardest Hit Countries vs The World")+
-  theme_tufte()
-
 
 ```
 
@@ -328,11 +201,8 @@ share_of_cases <- confirmed_cases%>%
   arrange(desc(p_of_total_cases))%>%
   mutate(cumulative_p_of_total_cases = cumsum(p_of_total_cases))
 
-head(share_of_cases, 15)
 
 ```
-
-The table shows that 4 countries account for over 50% of worldwide COVID-19 cases, and 15 countries account for 75%.
 
 #US Progression 
 ```{r}
@@ -343,7 +213,6 @@ usa_events <- tribble(
   "2020-03-11", "Pandemic\nDeclared",
 )%>%
   mutate(date = as.Date(date))
-
 
 ggplot(confirmed_cases_USA) +
   geom_line(mapping = aes(x=date, y = Cumulative_cases)) +
@@ -371,11 +240,3 @@ ggplot(usa_vs_world_notus, mapping = aes(x=date, y=Cumulative_cases))+
   geom_text(aes(x=date, label = event), data = usa_events, y=1500000)
 
 ```
-
-The first graph shows that the United States is continuing to increase in the number of confirmed COVID-19 cases at a quadratic rate, despite the lockdown efforts. This is additionally concerning since some states are opposed continuing (or reimplementing) lockdown measures. It would be of great value to continue monitoring cases by state and for states to make the best decision, given their circumstamce. 
-The second graph shows that, despite the hardest hit countries being lumped with the rest of the world, the rate of increase in confirmed COVID-19 cases seems to be decreasing. 
-
-
-
-
-
